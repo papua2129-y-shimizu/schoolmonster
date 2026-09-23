@@ -51,16 +51,35 @@
   }
   async function loadImages() {
     const ids = [...new Set([...root.querySelectorAll('img[data-image]')].map(img => img.dataset.image))];
-    await Promise.all(ids.map(async id => {
+    for (const id of ids) {
       if (!state.imageCache[id]) {
-        try { state.imageCache[id] = await api('monsterImage', id); }
-        catch (error) { state.imageCache[id] = ''; }
+        for (let attempt = 0; attempt < 2 && !state.imageCache[id]; attempt++) {
+          try { state.imageCache[id] = await api('monsterImage', id); }
+          catch (error) {
+            if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
+          }
+        }
       }
       root.querySelectorAll('img[data-image]').forEach(img => {
         if (img.dataset.image === id && state.imageCache[id]) img.src = state.imageCache[id];
         if (img.dataset.image === id && !state.imageCache[id]) img.alt = '画像を読み込めませんでした';
       });
-    }));
+    }
+  }
+  function battleStatus() {
+    const current = state.data && state.data.current;
+    if (!current) return '';
+    const remainingRate = Math.max(0, current.currentHp / current.maxHp);
+    const weakened = Math.round((1 - remainingRate) * 100);
+    const average = state.data.preview.average;
+    const estimated = average === null ? 0 : Math.round(average * Number(state.data.config.DAMAGE_MULTIPLIER));
+    const attacks = estimated > 0 ? Math.ceil(current.currentHp / estimated) : null;
+    return `<section class="battle-status" aria-label="現在の挑戦状況"><div><span class="badge active">挑戦中</span>
+      <strong>${safe(current.name)}</strong><span>${'★'.repeat(current.difficulty)}</span></div>
+      <div class="battle-status-progress"><div><b>残りHP ${current.currentHp.toLocaleString()}</b> / ${current.maxHp.toLocaleString()}</div>
+      <div class="mini-hp"><span style="width:${remainingRate * 100}%"></span></div></div>
+      <div class="battle-outlook"><b>${weakened}%</b> 弱らせた${attacks ? ` · 今日と同じ調子ならあと約${attacks}回` : ''}</div>
+      <button class="btn primary" data-action="main">現在の討伐画面を見る</button></section>`;
   }
   function mainView() {
     const data = state.data;
@@ -106,7 +125,7 @@
     const page = (items, title) => `<section class="book-page"><h2>${title}</h2><div class="card-grid">${items.map(monster =>
       `<button class="monster-card" data-action="detail" data-id="${safe(monster.monsterId)}">${image(monster.monsterId)}
       <strong>${safe(monster.name)}</strong><span class="badge ${safe(monster.status)}">${safe(labels[monster.status])}</span></button>`).join('')}</div></section>`;
-    return shell(`<main class="book">${page(cards.slice(0, 3), 'スクモン図鑑')}${page(cards.slice(3, 6), `${start + 1} - ${Math.min(start + 6, monsters.length)}`)}</main>
+    return shell(`${battleStatus()}<main class="book">${page(cards.slice(0, 3), 'スクモン図鑑')}${page(cards.slice(3, 6), `${start + 1} - ${Math.min(start + 6, monsters.length)}`)}</main>
       <nav class="book-nav"><button class="btn" data-action="book-prev" ${state.pageIndex === 0 ? 'disabled' : ''}>‹ 前のページ</button>
       <span class="page-number">${state.pageIndex + 1} / ${Math.max(1, Math.ceil(monsters.length / 6))}</span>
       <button class="btn" data-action="book-next" ${start + 6 >= monsters.length ? 'disabled' : ''}>次のページ ›</button></nav>`);
@@ -117,7 +136,7 @@
     const defeated = attempts.filter(item => item.status === 'defeated');
     const last = defeated.length ? defeated[defeated.length - 1] : null;
     const hp = Number(state.data.config['HP_' + state.difficulty]);
-    return shell(`<main class="detail"><div>${image(monster.monsterId, 'detail-image')}</div><section>
+    return shell(`${battleStatus()}<main class="detail"><div>${image(monster.monsterId, 'detail-image')}</div><section>
       <div class="eyebrow">MONSTER FILE</div><h1>${safe(monster.name)}</h1>
       <p>${safe(monster.description || '説明はMonstersシートで編集できます。')}</p>
       <div class="stat-band"><div class="stat-label">これまでの討伐</div><div class="damage">${defeated.length} 回</div>
@@ -125,6 +144,7 @@
       <div class="stat-band"><div class="stat-label">今回の強さ</div><div class="difficulty">${[1,2,3].map(level =>
         `<button class="btn ${state.difficulty === level ? 'selected' : ''}" data-action="difficulty" data-level="${level}" aria-pressed="${state.difficulty === level}">${'★'.repeat(level)}</button>`).join('')}</div>
         <div class="hp-row"><span>初期HP</span><b>${hp.toLocaleString()}</b></div></div>
+      ${state.data.current ? '<p class="active-notice">現在は別のスクモンに挑戦中です。上の「現在の討伐画面を見る」から進捗を確認できます。</p>' : ''}
       <button class="btn primary" data-action="start" data-mutate ${state.data.current ? 'disabled title="挑戦中のモンスターがあります"' : ''}>このモンスターに挑戦する</button>
       <h2>挑戦履歴</h2><div class="history-list">${attempts.length ? attempts.map((item, index) =>
         `<div class="history-item">${index + 1}回目 · ${'★'.repeat(item.difficulty)} · ${safe(item.startDate)} · ${safe(labels[item.status] || '終了')}

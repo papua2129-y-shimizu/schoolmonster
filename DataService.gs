@@ -98,13 +98,26 @@ function setupApp(folderId) {
       const form = FormApp.create('スクモン 今日のふり返り');
       const choices = Array.from({ length: 21 }, (_, i) => String(i * 5));
       form.addMultipleChoiceItem().setTitle(SCORE_QUESTION).setChoiceValues(choices).setRequired(true);
+      form.setCollectEmail(true);
       form.setDestination(FormApp.DestinationType.SPREADSHEET, book.getId());
       formUrl = form.getPublishedUrl();
       props.setProperty('SUKUMON_FORM_URL', formUrl);
       props.setProperty('SUKUMON_FORM_ID', form.getId());
+    } else {
+      enableEmailCollection();
     }
     if (settings().DRIVE_FOLDER_ID) syncMonsters();
     return { spreadsheetUrl: book.getUrl(), formUrl, monsterCount: rows('Monsters').length };
+  } catch (error) { publicError(error); }
+}
+
+function enableEmailCollection() {
+  try {
+    const formId = PropertiesService.getScriptProperties().getProperty('SUKUMON_FORM_ID');
+    if (!formId) throw new Error('フォームが未設定です。先に setupApp を実行してください。');
+    const form = FormApp.openById(formId);
+    form.setCollectEmail(true);
+    return { enabled: form.collectsEmail(), formUrl: form.getPublishedUrl() };
   } catch (error) { publicError(error); }
 }
 
@@ -141,9 +154,22 @@ function scoresForDate(day, config) {
   const headers = data[0].map(String);
   const scoreCol = columnIndex(config.SCORE_COLUMN, headers, [SCORE_QUESTION]);
   const timeCol = columnIndex(config.TIMESTAMP_COLUMN, headers, ['タイムスタンプ', 'Timestamp']);
-  if (scoreCol < 0 || timeCol < 0 || scoreCol >= headers.length || timeCol >= headers.length) {
-    throw new Error('回答の日時列または点数列を確認してください。');
+  const emailCol = columnIndex('', headers, ['メールアドレス', 'Email Address']);
+  if (scoreCol < 0 || timeCol < 0 || emailCol < 0 || scoreCol >= headers.length ||
+      timeCol >= headers.length || emailCol >= headers.length) {
+    throw new Error('回答のメールアドレス列・日時列・点数列を確認してください。');
   }
-  return data.slice(1).filter(row => dateKey(row[timeCol]) === day).map(row => Number(row[scoreCol]))
-    .filter(score => Number.isFinite(score) && score >= 0 && score <= 100 && score % 5 === 0);
+  const latest = new Map();
+  data.slice(1).forEach((row, index) => {
+    if (dateKey(row[timeCol]) !== day) return;
+    const email = String(row[emailCol] || '').trim().toLowerCase();
+    const score = Number(row[scoreCol]);
+    if (!email || !Number.isFinite(score) || score < 0 || score > 100 || score % 5 !== 0) return;
+    const timestamp = row[timeCol] instanceof Date ? row[timeCol].getTime() : new Date(row[timeCol]).getTime();
+    const previous = latest.get(email);
+    if (!previous || !Number.isFinite(timestamp) || timestamp >= previous.timestamp) {
+      latest.set(email, { score, timestamp: Number.isFinite(timestamp) ? timestamp : index });
+    }
+  });
+  return [...latest.values()].map(item => item.score);
 }

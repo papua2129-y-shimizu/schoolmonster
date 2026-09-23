@@ -99,13 +99,13 @@
       <div class="monster-scene ${sceneClass}" id="monster-scene">${image(current.monsterId)}
       ${hpRate > 0 && hpRate <= .1 ? '<div class="near">あと少し！</div>' : ''}</div></section>
       <aside class="side-stats"><section class="stat-band"><div class="stat-label">今日のクラス平均</div>
-      <div class="avg-line"><div class="hero-number">${shownAverage === null || shownAverage === undefined ? '—' : safe(Number(shownAverage.toFixed(1)))}<small>点</small></div>
+      <div class="avg-line"><div class="hero-number">${shownAverage == null || shownAverage === '' ? '—' : safe(Number(Number(shownAverage).toFixed(1)))}<small>点</small></div>
       <div><div class="stat-label">${data.todayAttacked ? '今日のダメージ' : '基本ダメージ見込み'}</div>
       <div class="damage">${data.todayAttacked ? safe(data.todayDamage) : estimated === null ? '—' : estimated}</div></div></div>
       <div class="muted small">${data.preview.error ? safe(data.preview.error) : `${data.preview.responseCount}人が回答`}</div></section>
       <section class="stat-band"><div class="stat-label">今週のクラス平均</div><div class="chart">${data.week.map(point =>
-        `<div class="bar-col ${point.date === data.day ? 'today' : ''}"><div class="bar-value">${point.average === null ? '—' : safe(Number(point.average.toFixed(1)))}</div>
-        <div class="bar-track"><div class="bar" style="height:${point.average === null ? 0 : point.average}%"></div></div><span>${point.label}</span></div>`).join('')}</div></section>
+        `<div class="bar-col ${point.date === data.day ? 'today' : ''}"><div class="bar-value">${point.average == null || point.average === '' ? '—' : safe(Number(Number(point.average).toFixed(1)))}</div>
+        <div class="bar-track"><div class="bar" style="height:${point.average == null || point.average === '' ? 0 : Number(point.average)}%"></div></div><span>${point.label}</span></div>`).join('')}</div></section>
       <section class="stat-band"><div class="stat-label">成長コンボ</div><div class="combo"><strong>${current.comboCount} COMBO</strong>
       <span class="combo-bonus">+${Number(data.config['BONUS_' + Math.min(current.comboCount, 4)] || 0)}</span></div></section></aside></main>
       <footer class="battle-footer"><div><div class="hp-row"><span>MONSTER HP</span><span><b>${current.currentHp.toLocaleString()}</b> / ${current.maxHp.toLocaleString()}</span></div>

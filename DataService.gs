@@ -56,6 +56,11 @@ function saveSettings(input) {
         next[key] = value === true || value === 'true';
       } else {
         next[key] = String(value || '').trim();
+        if (key === 'HOLIDAYS') {
+          const dates = next[key].split(',').map(item => item.trim()).filter(Boolean);
+          if (dates.some(item => !/^\d{4}-\d{2}-\d{2}$/.test(item))) throw new Error('設定値が正しくありません: HOLIDAYS');
+          next[key] = [...new Set(dates)].sort().join(',');
+        }
       }
     });
     if (next.DRIVE_FOLDER_ID) {

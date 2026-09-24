@@ -27,6 +27,22 @@ function previousDate(day) {
   return date.toISOString().slice(0, 10);
 }
 
+function holidayDates(settings) {
+  return String(settings.HOLIDAYS || '').split(',').map(value => value.trim())
+    .filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
+function isSchoolDay(day, settings) {
+  const weekday = new Date(day + 'T12:00:00Z').getUTCDay();
+  return weekday >= 1 && weekday <= 5 && !holidayDates(settings).includes(day);
+}
+
+function previousSchoolDate(day, settings) {
+  let candidate = previousDate(day);
+  while (!isSchoolDay(candidate, settings)) candidate = previousDate(candidate);
+  return candidate;
+}
+
 function weekDates(day) {
   const date = new Date(day + 'T12:00:00Z');
   const weekday = date.getUTCDay();

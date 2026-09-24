@@ -11,7 +11,7 @@ let sequence = 0;
 const config = {
   HP_1: 7000, HP_2: 8500, HP_3: 10000, DAMAGE_MULTIPLIER: 20,
   COMBO_RISE: 3, COMBO_MINIMUM: 60, BONUS_1: 100, BONUS_2: 200,
-  BONUS_3: 300, BONUS_4: 500, DRIVE_FOLDER_ID: 'folder'
+  BONUS_3: 300, BONUS_4: 500, DRIVE_FOLDER_ID: 'folder', HOLIDAYS: ''
 };
 const context = vm.createContext({
   console: { error() {} }, Date, Math, Number, String, Array, Object,
@@ -66,17 +66,26 @@ check('上昇幅不足ならコンボ不成立', () => {
 check('コンボが途切れる', () => {
   reset({ scores: [60], history: [history('2026-09-17', 65, 2)] }); assert.equal(attack().combo, 0);
 });
+check('月曜が休日なら火曜は前週金曜を直前の登校日とする', () => {
+  config.HOLIDAYS = '2026-09-21';
+  assert.equal(context.previousSchoolDate('2026-09-22', config), '2026-09-18');
+  config.HOLIDAYS = '';
+});
+check('休日は攻撃できない', () => {
+  config.HOLIDAYS = '2026-09-18'; reset({ scores: [80] });
+  assert.throws(attack, /休日/); config.HOLIDAYS = '';
+});
 check('HPちょうど0で討伐', () => {
   reset({ scores: [80], hp: 1600 }); assert.equal(attack().defeated, true); assert.equal(data.Challenges[0].currentHp, 0);
 });
 check('HP超過ダメージでも負数にしない', () => {
   reset({ scores: [100], hp: 1000 }); attack(); assert.equal(data.Challenges[0].currentHp, 0);
 });
-check('金曜から翌週へHP持ち越し', () => {
+check('週末を飛ばして登校日のコンボを継続', () => {
   reset({ day: '2026-09-18', scores: [50] }); attack();
   day = '2026-09-21'; scores = [60]; attack();
-  assert.equal(data.Challenges[0].currentHp, 7000 - 1000 - 1200);
-  assert.equal(data.Challenges[0].comboCount, 0);
+  assert.equal(data.Challenges[0].currentHp, 7000 - 1000 - 1300);
+  assert.equal(data.Challenges[0].comboCount, 1);
 });
 check('同じ日の二重攻撃を防ぐ', () => { reset({ scores: [80] }); attack(); assert.throws(attack, /すでに今日/); });
 check('討伐済モンスターに再挑戦', () => {

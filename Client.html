@@ -104,7 +104,7 @@
       <div class="damage">${data.todayAttacked ? safe(data.todayDamage) : estimated === null ? '—' : estimated}</div></div></div>
       <div class="muted small">${data.preview.error ? safe(data.preview.error) : `${data.preview.responseCount}人が回答`}</div></section>
       <section class="stat-band"><div class="stat-label">今週のクラス平均</div><div class="chart">${data.week.map(point =>
-        `<div class="bar-col ${point.date === data.day ? 'today' : ''}"><div class="bar-value">${point.average == null || point.average === '' ? '—' : safe(Number(Number(point.average).toFixed(1)))}</div>
+        `<div class="bar-col ${point.date === data.day ? 'today' : ''} ${point.holiday ? 'holiday' : ''}"><div class="bar-value">${point.holiday ? '休' : point.average == null || point.average === '' ? '—' : safe(Number(Number(point.average).toFixed(1)))}</div>
         <div class="bar-track"><div class="bar" style="height:${point.average == null || point.average === '' ? 0 : Number(point.average)}%"></div></div><span>${point.label}</span></div>`).join('')}</div></section>
       <section class="stat-band"><div class="stat-label">成長コンボ</div><div class="combo"><strong>${current.comboCount} COMBO</strong>
       <span class="combo-bonus">+${Number(data.config['BONUS_' + Math.min(current.comboCount, 4)] || 0)}</span></div></section></aside></main>
@@ -153,6 +153,7 @@
   }
   function settingsView() {
     const config = state.data.config;
+    const holidays = String(config.HOLIDAYS || '').split(',').filter(Boolean).sort();
     const fields = Object.entries(settingLabels).map(([key, label]) =>
       `<label class="field">${safe(label)}<input name="${key}" value="${safe(config[key])}" ${typeof config[key] === 'number' ? 'type="number" min="0" step="any"' : 'type="text"'}></label>`).join('');
     return shell(`<main class="settings"><h1>設定</h1><section class="settings-section"><h2>データと画像</h2>
@@ -161,6 +162,11 @@
       <section class="settings-section"><div class="settings-grid">${fields}<label class="field">効果音
       <select name="SOUND_ON"><option value="true" ${config.SOUND_ON === true || config.SOUND_ON === 'true' ? 'selected' : ''}>ON</option>
       <option value="false" ${config.SOUND_ON === false || config.SOUND_ON === 'false' ? 'selected' : ''}>OFF</option></select></label></div>
+      <section class="holiday-settings"><h2>休日設定</h2><p class="muted">土日は自動で休みです。祝日、振替休日、学校行事の休みを追加できます。</p>
+      <input type="hidden" name="HOLIDAYS" value="${safe(holidays.join(','))}"><div class="holiday-add">
+      <label class="field">休日にする日<input id="holiday-date" type="date"></label>
+      <button class="btn" type="button" data-action="add-holiday">追加</button></div>
+      <div class="holiday-list">${holidays.length ? holidays.map(date => `<span>${safe(date)}<button type="button" data-action="remove-holiday" data-date="${safe(date)}" aria-label="${safe(date)}を削除">×</button></span>`).join('') : '<span class="muted">登録された休日はありません。</span>'}</div></section>
       <div class="settings-actions" style="margin-top:18px"><button class="btn primary" data-action="save-settings" data-mutate>設定を保存</button>
       <button class="btn" data-action="sync" data-mutate>モンスター画像を再読込</button></div></section>
       <section class="settings-section"><h2>現在の挑戦</h2><div class="settings-actions">
@@ -266,6 +272,16 @@
     if (action === 'difficulty') { state.difficulty = Number(button.dataset.level); render(); return; }
     if (action === 'detail') { await run(() => openDetail(button.dataset.id)); return; }
     if (action === 'result') { await run(() => openResult(button.dataset.id)); return; }
+    if (action === 'add-holiday') {
+      const value = document.getElementById('holiday-date').value;
+      if (!value) { toast('休日にする日を選んでください。'); return; }
+      const dates = new Set(String(state.data.config.HOLIDAYS || '').split(',').filter(Boolean));
+      dates.add(value); state.data.config.HOLIDAYS = [...dates].sort().join(','); render(); return;
+    }
+    if (action === 'remove-holiday') {
+      state.data.config.HOLIDAYS = String(state.data.config.HOLIDAYS || '').split(',')
+        .filter(date => date && date !== button.dataset.date).join(','); render(); return;
+    }
     if (action === 'setup') {
       const folder = document.getElementById('setup-folder').value.trim();
       await run(async () => { await api('setupApp', folder); await refresh(); }); return;

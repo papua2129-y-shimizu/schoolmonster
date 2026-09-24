@@ -17,15 +17,19 @@ function dashboard() {
     const allChallenges = rows('Challenges');
     let preview = { average: null, responseCount: 0, error: '' };
     try {
-      const scores = scoresForDate(day, config);
-      preview = { average: averageScore(scores), responseCount: scores.length,
-        error: scores.length ? '' : '今日の回答がまだありません。' };
+      if (!isSchoolDay(day, config)) preview.error = '今日は休日に設定されています。';
+      else {
+        const scores = scoresForDate(day, config);
+        preview = { average: averageScore(scores), responseCount: scores.length,
+          error: scores.length ? '' : '今日の回答がまだありません。' };
+      }
     } catch (error) { preview.error = error.message; }
     const history = challenge ? dailyFor(challenge.challengeId) : [];
     const todayAttack = history.find(row => dateKey(row.date) === day);
     const week = weekDates(day).map((date, index) => {
       const point = history.find(row => dateKey(row.date) === date);
-      return { date, label: ['月', '火', '水', '木', '金'][index], average: point ? Number(point.averageScore) : null };
+      return { date, label: ['月', '火', '水', '木', '金'][index], average: point ? Number(point.averageScore) : null,
+        holiday: holidayDates(config).includes(date) };
     });
     return {
       day, config, spreadsheetUrl: dataBook().getUrl(),

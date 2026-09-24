@@ -21,6 +21,7 @@ const DEFAULTS = Object.freeze({
   BONUS_2: 200,
   BONUS_3: 300,
   BONUS_4: 500,
+  HOLIDAYS: '',
   SOUND_ON: true
 });
 

@@ -40,13 +40,14 @@ function attackToday() {
     }
     const history = dailyFor(challenge.challengeId);
     const config = settings();
+    if (!isSchoolDay(day, config)) throw new Error('今日は休日に設定されているため、攻撃できません。');
     const scores = scoresForDate(day, config);
     if (!scores.length) throw new Error('今日の回答がまだありません。');
     const average = averageScore(scores);
     const previous = history.length ? history[history.length - 1] : null;
     const combo = comboForDay(average, previous ? Number(previous.averageScore) : null,
       previous ? Number(previous.comboCount) : 0, config,
-      !!previous && dateKey(previous.date) === previousDate(day));
+      !!previous && dateKey(previous.date) === previousSchoolDate(day, config));
     const damage = damageForDay(average, combo, config);
     const before = Number(challenge.currentHp);
     const after = Math.max(0, before - damage.total);

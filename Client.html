@@ -203,21 +203,45 @@
     try {
       const Context = window.AudioContext || window.webkitAudioContext;
       state.audio = state.audio || new Context();
+      if (state.audio.state === 'suspended') state.audio.resume();
       const now = state.audio.currentTime;
-      const notes = kind === 'victory' ? [392, 523, 659] : kind === 'combo' ? [660, 880] : [135];
+      const notes = kind === 'victory' ? [392, 523, 659, 784]
+        : kind === 'combo' ? [660, 880] : kind === 'charge' ? [180, 240] : [110, 82];
       notes.forEach((frequency, index) => {
         const oscillator = state.audio.createOscillator();
         const gain = state.audio.createGain();
-        oscillator.type = kind === 'attack' ? 'triangle' : 'sine';
-        oscillator.frequency.setValueAtTime(frequency, now + index * .12);
-        gain.gain.setValueAtTime(.0001, now + index * .12);
-        gain.gain.exponentialRampToValueAtTime(.07, now + index * .12 + .025);
-        gain.gain.exponentialRampToValueAtTime(.0001, now + index * .12 + .22);
+        const start = now + index * (kind === 'victory' ? .13 : .07);
+        oscillator.type = kind === 'attack' ? 'sawtooth' : kind === 'charge' ? 'square' : 'sine';
+        oscillator.frequency.setValueAtTime(frequency, start);
+        if (kind === 'attack') oscillator.frequency.exponentialRampToValueAtTime(42, start + .24);
+        gain.gain.setValueAtTime(.0001, start);
+        gain.gain.exponentialRampToValueAtTime(kind === 'attack' ? .13 : .075, start + .018);
+        gain.gain.exponentialRampToValueAtTime(.0001, start + (kind === 'victory' ? .34 : .24));
         oscillator.connect(gain).connect(state.audio.destination);
-        oscillator.start(now + index * .12);
-        oscillator.stop(now + index * .12 + .23);
+        oscillator.start(start);
+        oscillator.stop(start + (kind === 'victory' ? .35 : .25));
       });
+      if (kind === 'attack' || kind === 'victory') {
+        const length = Math.floor(state.audio.sampleRate * .32);
+        const buffer = state.audio.createBuffer(1, length, state.audio.sampleRate);
+        const samples = buffer.getChannelData(0);
+        for (let i = 0; i < length; i++) samples[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+        const noise = state.audio.createBufferSource();
+        const noiseGain = state.audio.createGain();
+        noise.buffer = buffer;
+        noiseGain.gain.setValueAtTime(kind === 'victory' ? .18 : .1, now);
+        noiseGain.gain.exponentialRampToValueAtTime(.0001, now + .32);
+        noise.connect(noiseGain).connect(state.audio.destination);
+        noise.start(now);
+      }
     } catch (error) { /* 音が使えない端末でも討伐を続ける。 */ }
+  }
+  function victoryEffect() {
+    const sparks = Array.from({ length: 18 }, (_, index) =>
+      `<i style="--i:${index};--angle:${index * 20}deg"></i>`).join('');
+    document.body.insertAdjacentHTML('beforeend', `<div class="victory-overlay" role="status" aria-live="assertive">
+      <div class="explosion"><span class="blast-core"></span><span class="blast-ring"></span>${sparks}</div>
+      <div class="victory-copy"><b>撃破！！</b><span>MONSTER DEFEATED</span></div></div>`);
   }
   async function openDetail(id) {
     state.detail = await api('monsterDetail', id);
@@ -251,6 +275,8 @@
       await run(async () => { await api('startChallenge', state.detail.monster.monsterId, state.difficulty); state.page = 'main'; await refresh(); }); return;
     }
     if (action === 'attack') {
+      sound('charge');
+      document.getElementById('monster-scene')?.classList.add('strike');
       await run(async () => {
         const result = await api('attackToday');
         sound(result.defeated ? 'victory' : result.combo ? 'combo' : 'attack');
@@ -258,8 +284,9 @@
         float.className = 'damage-float'; float.textContent = `-${result.damage.total}`;
         document.body.appendChild(float); setTimeout(() => float.remove(), 1200);
         if (result.defeated) {
-          document.body.insertAdjacentHTML('beforeend', '<div class="victory-overlay">撃破！！</div>');
-          await new Promise(resolve => setTimeout(resolve, 1600));
+          document.getElementById('monster-scene')?.classList.add('defeated');
+          victoryEffect();
+          await new Promise(resolve => setTimeout(resolve, 2300));
           document.querySelector('.victory-overlay')?.remove();
           await openResult(result.challengeId);
         } else { await refresh(); }

@@ -120,15 +120,17 @@
     if (state.pageIndex < 0) return shell(`<main class="book-cover"><div class="eyebrow">MONSTER ENCYCLOPEDIA</div>
       <h1>4年3組<br>スクモン討伐図鑑</h1><div class="count">討伐数 ${defeatedCount} / ${monsters.length}</div>
       <button class="btn primary" data-action="book-open">ひらく</button></main>`);
-    const start = state.pageIndex * 6;
-    const cards = monsters.slice(start, start + 6);
+    const pageSize = 12;
+    const start = state.pageIndex * pageSize;
+    const cards = monsters.slice(start, start + pageSize);
     const page = (items, title) => `<section class="book-page"><h2>${title}</h2><div class="card-grid">${items.map(monster =>
-      `<button class="monster-card" data-action="detail" data-id="${safe(monster.monsterId)}">${image(monster.monsterId)}
-      <strong>${safe(monster.name)}</strong><span class="badge ${safe(monster.status)}">${safe(labels[monster.status])}</span></button>`).join('')}</div></section>`;
-    return shell(`${battleStatus()}<main class="book">${page(cards.slice(0, 3), 'スクモン図鑑')}${page(cards.slice(3, 6), `${start + 1} - ${Math.min(start + 6, monsters.length)}`)}</main>
+      `<button class="monster-card ${monster.defeatedCount > 0 ? 'captured' : ''}" data-action="detail" data-id="${safe(monster.monsterId)}">${image(monster.monsterId)}
+      <strong>${safe(monster.name)}</strong><span class="badge ${safe(monster.status)}">${safe(labels[monster.status])}</span>
+      ${monster.defeatedCount > 0 ? '<span class="capture-mark"><b>捕獲済み</b></span>' : ''}</button>`).join('')}</div></section>`;
+    return shell(`${battleStatus()}<main class="book">${page(cards.slice(0, 6), `${start + 1} - ${Math.min(start + 6, monsters.length)}`)}${page(cards.slice(6, 12), cards.length > 6 ? `${start + 7} - ${Math.min(start + 12, monsters.length)}` : 'スクモン図鑑')}</main>
       <nav class="book-nav"><button class="btn" data-action="book-prev" ${state.pageIndex === 0 ? 'disabled' : ''}>‹ 前のページ</button>
-      <span class="page-number">${state.pageIndex + 1} / ${Math.max(1, Math.ceil(monsters.length / 6))}</span>
-      <button class="btn" data-action="book-next" ${start + 6 >= monsters.length ? 'disabled' : ''}>次のページ ›</button></nav>`);
+      <span class="page-number">${state.pageIndex + 1} / ${Math.max(1, Math.ceil(monsters.length / pageSize))}</span>
+      <button class="btn" data-action="book-next" ${start + pageSize >= monsters.length ? 'disabled' : ''}>次のページ ›</button></nav>`);
   }
   function detailView() {
     if (!state.detail) return shell('<main class="empty-state">読み込み中…</main>');

@@ -1,7 +1,7 @@
 const TABLES = Object.freeze({
   Monsters: ['monsterId', 'name', 'description', 'driveFileId', 'fileName', 'createdAt', 'updatedAt'],
   Challenges: ['challengeId', 'monsterId', 'difficulty', 'maxHp', 'currentHp', 'startDate', 'endDate', 'status', 'totalDamage', 'maxCombo', 'firstAverage', 'lastAverage', 'highestAverage', 'comboCount'],
-  DailyStats: ['date', 'monsterId', 'challengeId', 'responseCount', 'averageScore', 'baseDamage', 'comboCount', 'comboBonus', 'totalDamage', 'hpBefore', 'hpAfter', 'attacked', 'createdAt'],
+  DailyStats: ['date', 'monsterId', 'challengeId', 'responseCount', 'averageScore', 'baseDamage', 'comboCount', 'comboBonus', 'totalDamage', 'hpBefore', 'hpAfter', 'attacked', 'createdAt', 'bonusLearning', 'bonusLife', 'bonusCooperation', 'bonusTotal'],
   BattleHistory: ['eventId', 'challengeId', 'date', 'action', 'damage', 'createdAt'],
   Settings: ['key', 'value']
 });
@@ -15,12 +15,9 @@ const DEFAULTS = Object.freeze({
   HP_2: 8500,
   HP_3: 10000,
   DAMAGE_MULTIPLIER: 20,
-  COMBO_RISE: 3,
-  COMBO_MINIMUM: 60,
-  BONUS_1: 100,
-  BONUS_2: 200,
-  BONUS_3: 300,
-  BONUS_4: 500,
+  BONUS_LEARNING: 100,
+  BONUS_LIFE: 50,
+  BONUS_COOPERATION: 100,
   HOLIDAYS: '',
   SOUND_ON: true
 });
@@ -46,6 +43,6 @@ function numberSetting(settings, key) {
 function publicError(error) {
   console.error(error && error.stack ? error.stack : error);
   const message = error && error.message ? error.message : '';
-  if (/^設定値|^回答|^今日|^すでに|^現在|^画像|^挑戦|^モンスター|^保存|^操作|^スプレッドシート|^Drive/.test(message)) throw new Error(message);
+  if (/^設定値|^回答|^今日|^すでに|^現在|^画像|^挑戦|^モンスター|^保存|^操作|^スプレッドシート|^Drive|^ボーナス/.test(message)) throw new Error(message);
   throw new Error('処理を完了できませんでした。設定とフォームの回答を確認してください。');
 }

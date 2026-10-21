@@ -4,21 +4,23 @@ function averageScore(scores) {
   return scores.reduce((sum, score) => sum + score, 0) / scores.length;
 }
 
-function comboForDay(average, previousAverage, previousCombo, settings, isPreviousDay) {
-  if (previousAverage === null || !isPreviousDay) return 0;
-  return average >= numberSetting(settings, 'COMBO_MINIMUM') &&
-    average - previousAverage >= numberSetting(settings, 'COMBO_RISE') ? previousCombo + 1 : 0;
+function classBonusForDay(selected, settings) {
+  const allowed = {
+    learning: 'BONUS_LEARNING', life: 'BONUS_LIFE', cooperation: 'BONUS_COOPERATION'
+  };
+  const keys = Array.isArray(selected) ? [...new Set(selected.map(String))] : [];
+  if (keys.length > 2 || keys.some(key => !allowed[key])) {
+    throw new Error('ボーナスは3項目から2つまで選んでください。');
+  }
+  const values = { learning: 0, life: 0, cooperation: 0 };
+  keys.forEach(key => { values[key] = numberSetting(settings, allowed[key]); });
+  return { selected: keys, values, total: Object.values(values).reduce((sum, value) => sum + value, 0) };
 }
 
-function bonusForCombo(combo, settings) {
-  if (combo <= 0) return 0;
-  return numberSetting(settings, 'BONUS_' + Math.min(combo, 4));
-}
-
-function damageForDay(average, combo, settings) {
+function damageForDay(average, selected, settings) {
   const base = Math.round(average * numberSetting(settings, 'DAMAGE_MULTIPLIER'));
-  const bonus = bonusForCombo(combo, settings);
-  return { base, bonus, total: base + bonus };
+  const classBonus = classBonusForDay(selected, settings);
+  return { base, bonus: classBonus.total, total: base + classBonus.total, classBonus };
 }
 
 function previousDate(day) {

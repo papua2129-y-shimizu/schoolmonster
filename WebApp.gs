@@ -10,6 +10,7 @@ function include(name) {
 
 function dashboard() {
   try {
+    ensureSchema();
     const day = todayKey();
     const challenge = activeChallenge();
     const config = settings();
@@ -39,10 +40,15 @@ function dashboard() {
         challengeId: String(challenge.challengeId), monsterId: String(challenge.monsterId),
         name: (monsters.find(item => item.monsterId === challenge.monsterId) || {}).name || 'スクモン',
         difficulty: Number(challenge.difficulty), maxHp: Number(challenge.maxHp),
-        currentHp: Number(challenge.currentHp), comboCount: Number(challenge.comboCount || 0),
+        currentHp: Number(challenge.currentHp),
         totalDamage: Number(challenge.totalDamage || 0), startDate: dateKey(challenge.startDate)
       } : null,
       todayDamage: todayAttack ? Number(todayAttack.totalDamage) : null,
+      todayBaseDamage: todayAttack ? Number(todayAttack.baseDamage) : null,
+      todayBonuses: todayAttack ? {
+        learning: Number(todayAttack.bonusLearning || 0), life: Number(todayAttack.bonusLife || 0),
+        cooperation: Number(todayAttack.bonusCooperation || 0), total: Number(todayAttack.bonusTotal || 0)
+      } : null,
       monsters: monsters.map(monster => {
         const attempts = allChallenges.filter(row => row.monsterId === monster.monsterId);
         const defeated = attempts.filter(row => row.status === 'defeated').length;
@@ -69,7 +75,8 @@ function battleResult(challengeId) {
       difficulty: Number(challenge.difficulty), startDate: dateKey(challenge.startDate),
       endDate: dateKey(challenge.endDate), days: inclusiveDays(dateKey(challenge.startDate), dateKey(challenge.endDate)),
       firstAverage: Number(challenge.firstAverage), lastAverage: Number(challenge.lastAverage),
-      highestAverage: Number(challenge.highestAverage), maxCombo: Number(challenge.maxCombo),
+      highestAverage: Number(challenge.highestAverage),
+      totalBonus: history.reduce((sum, row) => sum + Number(row.bonusTotal || 0), 0),
       totalDamage: Number(challenge.totalDamage),
       points: history.map(row => ({ date: dateKey(row.date), average: Number(row.averageScore) }))
     };

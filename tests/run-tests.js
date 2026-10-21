@@ -10,8 +10,8 @@ let data;
 let sequence = 0;
 const config = {
   HP_1: 7000, HP_2: 8500, HP_3: 10000, DAMAGE_MULTIPLIER: 20,
-  COMBO_RISE: 3, COMBO_MINIMUM: 60, BONUS_1: 100, BONUS_2: 200,
-  BONUS_3: 300, BONUS_4: 500, DRIVE_FOLDER_ID: 'folder', HOLIDAYS: ''
+  BONUS_LEARNING: 100, BONUS_LIFE: 50, BONUS_COOPERATION: 100,
+  DRIVE_FOLDER_ID: 'folder', HOLIDAYS: ''
 };
 const context = vm.createContext({
   console: { error() {} }, Date, Math, Number, String, Array, Object,
@@ -43,10 +43,13 @@ function reset(options = {}) {
     DailyStats: options.history || [], BattleHistory: []
   };
 }
-function attack() { return context.attackToday(); }
-function history(date, average, combo = 0) {
+function attack(bonuses = []) { return context.attackToday(bonuses); }
+function history(date, average, bonuses = {}) {
   return { date, monsterId: 'm1', challengeId: 'c1', responseCount: 24, averageScore: average,
-    baseDamage: average * 20, comboCount: combo, comboBonus: 0, totalDamage: average * 20,
+    baseDamage: average * 20, comboCount: 0, comboBonus: 0,
+    bonusLearning: bonuses.learning || 0, bonusLife: bonuses.life || 0,
+    bonusCooperation: bonuses.cooperation || 0, bonusTotal: bonuses.total || 0,
+    totalDamage: average * 20 + (bonuses.total || 0),
     hpBefore: 7000, hpAfter: 7000 - average * 20, attacked: true, createdAt: new Date() };
 }
 function check(name, task) { task(); process.stdout.write(`PASS ${name}\n`); }
@@ -56,15 +59,20 @@ check('1件の日はその回答を平均にする', () => { reset({ scores: [80
 check('24人全員の平均', () => { reset({ scores: Array(24).fill(75) }); assert.equal(attack().average, 75); });
 check('欠席者がいても回答者だけで平均', () => { reset({ scores: Array(23).fill(70) }); assert.equal(attack().responseCount, 23); });
 check('小数の平均から整数ダメージ', () => { reset({ scores: [80, 85] }); assert.equal(attack().damage.total, 1650); });
-check('コンボ成立', () => {
-  reset({ scores: [65], history: [history('2026-09-17', 60)] });
-  const result = attack(); assert.equal(result.combo, 1); assert.equal(result.damage.bonus, 100);
+check('学習面と協力面のボーナスを加算', () => {
+  reset({ scores: [65] });
+  const result = attack(['learning', 'cooperation']);
+  assert.equal(result.damage.base, 1300);
+  assert.equal(result.damage.bonus, 200);
+  assert.equal(result.damage.total, 1500);
+  assert.equal(data.DailyStats[0].bonusLearning, 100);
+  assert.equal(data.DailyStats[0].bonusCooperation, 100);
 });
-check('上昇幅不足ならコンボ不成立', () => {
-  reset({ scores: [60], history: [history('2026-09-17', 58)] }); assert.equal(attack().combo, 0);
+check('同じボーナスは重複加算しない', () => {
+  reset({ scores: [60] }); assert.equal(attack(['life', 'life']).damage.bonus, 50);
 });
-check('コンボが途切れる', () => {
-  reset({ scores: [60], history: [history('2026-09-17', 65, 2)] }); assert.equal(attack().combo, 0);
+check('ボーナスは2つまで', () => {
+  reset({ scores: [60] }); assert.throws(() => attack(['learning', 'life', 'cooperation']), /2つまで/);
 });
 check('月曜が休日なら火曜は前週金曜を直前の登校日とする', () => {
   config.HOLIDAYS = '2026-09-21';
@@ -81,11 +89,10 @@ check('HPちょうど0で討伐', () => {
 check('HP超過ダメージでも負数にしない', () => {
   reset({ scores: [100], hp: 1000 }); attack(); assert.equal(data.Challenges[0].currentHp, 0);
 });
-check('週末を飛ばして登校日のコンボを継続', () => {
+check('週末をまたいでも平均点だけで基本ダメージを計算', () => {
   reset({ day: '2026-09-18', scores: [50] }); attack();
   day = '2026-09-21'; scores = [60]; attack();
-  assert.equal(data.Challenges[0].currentHp, 7000 - 1000 - 1300);
-  assert.equal(data.Challenges[0].comboCount, 1);
+  assert.equal(data.Challenges[0].currentHp, 7000 - 1000 - 1200);
 });
 check('同じ日の二重攻撃を防ぐ', () => { reset({ scores: [80] }); attack(); assert.throws(attack, /すでに今日/); });
 check('討伐済モンスターに再挑戦', () => {

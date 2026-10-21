@@ -1,7 +1,7 @@
 <script>
 (() => {
   const state = { page: 'main', data: null, detail: null, result: null, pageIndex: 0,
-    difficulty: 1, imageCache: {}, busy: false, audio: null };
+    difficulty: 1, imageCache: {}, busy: false, audio: null, bonuses: [] };
   const root = document.getElementById('app');
   const toastNode = document.getElementById('toast');
   const labels = { new: '未挑戦', active: '挑戦中', defeated: '討伐済', retry: '再挑戦可能' };
@@ -9,10 +9,14 @@
     DRIVE_FOLDER_ID: 'Drive画像フォルダID', RESPONSE_SHEET_NAME: '回答シート名',
     SCORE_COLUMN: '点数列（列記号または見出し）', TIMESTAMP_COLUMN: '回答日時列（列記号または見出し）',
     HP_1: '★ 初期HP', HP_2: '★★ 初期HP', HP_3: '★★★ 初期HP',
-    DAMAGE_MULTIPLIER: 'ダメージ倍率', COMBO_RISE: 'コンボ上昇幅', COMBO_MINIMUM: 'コンボ最低平均',
-    BONUS_1: '1 COMBO ボーナス', BONUS_2: '2 COMBO ボーナス',
-    BONUS_3: '3 COMBO ボーナス', BONUS_4: '4 COMBO以上 ボーナス'
+    DAMAGE_MULTIPLIER: 'ダメージ倍率', BONUS_LEARNING: '学習面ボーナス',
+    BONUS_LIFE: '生活面ボーナス', BONUS_COOPERATION: '協力面ボーナス'
   };
+  const bonusOptions = [
+    { key: 'learning', label: '学習面', detail: '宿題・授業準備', icon: '▣', config: 'BONUS_LEARNING' },
+    { key: 'life', label: '生活面', detail: '整理整頓・切り替え', icon: '✓', config: 'BONUS_LIFE' },
+    { key: 'cooperation', label: '協力面', detail: '助け合い・めあて達成', icon: '●●●', config: 'BONUS_COOPERATION' }
+  ];
 
   function safe(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, char =>
@@ -92,7 +96,22 @@
     const average = data.preview.average;
     const shownAverage = data.todayAttacked && data.week.some(point => point.date === data.day)
       ? (data.week.find(point => point.date === data.day) || {}).average : average;
-    const estimated = average === null ? null : Math.round(average * Number(data.config.DAMAGE_MULTIPLIER));
+    const baseDamage = data.todayAttacked ? data.todayBaseDamage
+      : average === null ? null : Math.round(average * Number(data.config.DAMAGE_MULTIPLIER));
+    const selectedBonus = data.todayAttacked ? Number(data.todayBonuses.total || 0)
+      : state.bonuses.reduce((sum, key) => {
+        const option = bonusOptions.find(item => item.key === key);
+        return sum + (option ? Number(data.config[option.config] || 0) : 0);
+      }, 0);
+    const totalDamage = baseDamage === null ? null : baseDamage + selectedBonus;
+    const bonusCards = bonusOptions.map(option => {
+      const lockedValue = data.todayAttacked && Number(data.todayBonuses[option.key] || 0) > 0;
+      const selected = data.todayAttacked ? lockedValue : state.bonuses.includes(option.key);
+      const points = Number(data.config[option.config] || 0);
+      return `<button class="bonus-card ${selected ? 'selected' : ''}" data-action="toggle-bonus" data-bonus="${option.key}"
+        aria-pressed="${selected}" ${data.todayAttacked ? 'disabled' : ''}><span class="bonus-check">${selected ? '✓' : ''}</span>
+        <span class="bonus-icon">${option.icon}</span><strong>${option.label}</strong><small>${option.detail}</small><b>+${points}</b></button>`;
+    }).join('');
     return shell(`<main class="main-stage"><section class="monster-side"><div class="monster-head"><div>
       <div class="eyebrow">CURRENT BATTLE · ${safe(current.startDate)}</div>
       <h1 class="title">${safe(current.name)}</h1></div><div class="stars" aria-label="強さ${current.difficulty}">${'★'.repeat(current.difficulty)}</div></div>
@@ -100,19 +119,21 @@
       ${hpRate > 0 && hpRate <= .1 ? '<div class="near">あと少し！</div>' : ''}</div></section>
       <aside class="side-stats"><section class="stat-band"><div class="stat-label">今日のクラス平均</div>
       <div class="avg-line"><div class="hero-number">${shownAverage == null || shownAverage === '' ? '—' : safe(Number(Number(shownAverage).toFixed(1)))}<small>点</small></div>
-      <div><div class="stat-label">${data.todayAttacked ? '今日のダメージ' : '基本ダメージ見込み'}</div>
-      <div class="damage">${data.todayAttacked ? safe(data.todayDamage) : estimated === null ? '—' : estimated}</div></div></div>
+      <div><div class="stat-label">基本ダメージ</div>
+      <div class="damage">${baseDamage === null ? '—' : safe(baseDamage.toLocaleString())}</div></div></div>
       <div class="muted small">${data.preview.error ? safe(data.preview.error) : `${data.preview.responseCount}人が回答`}</div></section>
       <section class="stat-band"><div class="stat-label">今週のクラス平均</div><div class="chart">${data.week.map(point =>
         `<div class="bar-col ${point.date === data.day ? 'today' : ''} ${point.holiday ? 'holiday' : ''}"><div class="bar-value">${point.holiday ? '休' : point.average == null || point.average === '' ? '—' : safe(Number(Number(point.average).toFixed(1)))}</div>
         <div class="bar-track"><div class="bar" style="height:${point.average == null || point.average === '' ? 0 : Number(point.average)}%"></div></div><span>${point.label}</span></div>`).join('')}</div></section>
-      <section class="stat-band"><div class="stat-label">成長コンボ</div><div class="combo"><strong>${current.comboCount} COMBO</strong>
-      <span class="combo-bonus">+${Number(data.config['BONUS_' + Math.min(current.comboCount, 4)] || 0)}</span></div></section></aside></main>
+      <section class="stat-band class-bonus"><div class="bonus-heading"><div class="stat-label">今日のクラスボーナス</div><span>1日2つまで</span></div>
+      <div class="bonus-grid">${bonusCards}</div><div class="damage-calc"><span>基本 <b>${baseDamage === null ? '—' : baseDamage.toLocaleString()}</b></span>
+      <i>＋</i><span>ボーナス <b class="bonus-value">+${selectedBonus.toLocaleString()}</b></span><i>＝</i>
+      <span class="damage-total">合計 <b>${totalDamage === null ? '—' : totalDamage.toLocaleString()}</b> ダメージ</span></div></section></aside></main>
       <footer class="battle-footer"><div><div class="hp-row"><span>MONSTER HP</span><span><b>${current.currentHp.toLocaleString()}</b> / ${current.maxHp.toLocaleString()}</span></div>
       <div class="hp-track" role="progressbar" aria-label="モンスターHP" aria-valuenow="${current.currentHp}" aria-valuemax="${current.maxHp}">
       <div class="hp-fill ${hpRate <= .1 ? 'critical' : hpRate <= .25 ? 'low' : ''}" style="width:${Math.max(0, hpRate * 100)}%"></div></div></div>
       <button class="btn primary attack" data-action="attack" data-mutate ${data.todayAttacked || average === null ? 'disabled' : ''}>
-      ${data.todayAttacked ? '今日の攻撃済み' : '攻撃する'}</button></footer>`);
+      ${data.todayAttacked ? `今日の攻撃済み · ${Number(data.todayDamage).toLocaleString()}` : '攻撃する'}</button></footer>`);
   }
   function encyclopediaView() {
     const monsters = state.data.monsters;
@@ -183,7 +204,7 @@
     const stats = [
       ['討伐期間', `${result.days}日`], ['初日の平均', `${Number(result.firstAverage.toFixed(1))}点`],
       ['最終日の平均', `${Number(result.lastAverage.toFixed(1))}点`], ['最高平均', `${Number(result.highestAverage.toFixed(1))}点`],
-      ['最大コンボ', `${result.maxCombo} COMBO`], ['総ダメージ', result.totalDamage.toLocaleString()]
+      ['クラスボーナス合計', `+${result.totalBonus.toLocaleString()}`], ['総ダメージ', result.totalDamage.toLocaleString()]
     ];
     return shell(`<main class="result"><div class="eyebrow">BATTLE RESULT</div><h1>撃破！！</h1>
       <div class="result-main">${image(result.monsterId)}<section><h2>${safe(result.name)} ${'★'.repeat(result.difficulty)}</h2>
@@ -272,6 +293,13 @@
     if (action === 'book-prev') { state.pageIndex--; render(); return; }
     if (action === 'book-next') { state.pageIndex++; render(); return; }
     if (action === 'difficulty') { state.difficulty = Number(button.dataset.level); render(); return; }
+    if (action === 'toggle-bonus') {
+      const key = button.dataset.bonus;
+      if (state.bonuses.includes(key)) state.bonuses = state.bonuses.filter(item => item !== key);
+      else if (state.bonuses.length < 2) state.bonuses.push(key);
+      else { toast('ボーナスは1日2つまで選べます。'); return; }
+      render(); return;
+    }
     if (action === 'detail') { await run(() => openDetail(button.dataset.id)); return; }
     if (action === 'result') { await run(() => openResult(button.dataset.id)); return; }
     if (action === 'add-holiday') {
@@ -296,8 +324,9 @@
       sound('charge');
       document.getElementById('monster-scene')?.classList.add('strike');
       await run(async () => {
-        const result = await api('attackToday');
-        sound(result.defeated ? 'victory' : result.combo ? 'combo' : 'attack');
+        const result = await api('attackToday', state.bonuses);
+        sound(result.defeated ? 'victory' : result.damage.bonus > 0 ? 'combo' : 'attack');
+        state.bonuses = [];
         const float = document.createElement('div');
         float.className = 'damage-float'; float.textContent = `-${result.damage.total}`;
         document.body.appendChild(float); setTimeout(() => float.remove(), 1200);

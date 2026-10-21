@@ -10,6 +10,16 @@ function table(name) {
   return sheet;
 }
 
+function ensureSchema() {
+  const book = dataBook();
+  Object.keys(TABLES).forEach(name => {
+    let sheet = book.getSheetByName(name);
+    if (!sheet) sheet = book.insertSheet(name);
+    sheet.getRange(1, 1, 1, TABLES[name].length).setValues([TABLES[name]]);
+    sheet.setFrozenRows(1);
+  });
+}
+
 function rows(name) {
   const sheet = table(name);
   if (sheet.getLastRow() < 2) return [];

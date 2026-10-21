@@ -28,7 +28,7 @@ function startChallenge(monsterId, difficulty) {
   finally { lock.releaseLock(); }
 }
 
-function attackToday() {
+function attackToday(selectedBonuses) {
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
@@ -44,23 +44,22 @@ function attackToday() {
     const scores = scoresForDate(day, config);
     if (!scores.length) throw new Error('今日の回答がまだありません。');
     const average = averageScore(scores);
-    const previous = history.length ? history[history.length - 1] : null;
-    const combo = comboForDay(average, previous ? Number(previous.averageScore) : null,
-      previous ? Number(previous.comboCount) : 0, config,
-      !!previous && dateKey(previous.date) === previousSchoolDate(day, config));
-    const damage = damageForDay(average, combo, config);
+    const damage = damageForDay(average, selectedBonuses, config);
     const before = Number(challenge.currentHp);
     const after = Math.max(0, before - damage.total);
     appendRow('DailyStats', {
       date: day, monsterId: challenge.monsterId, challengeId: challenge.challengeId,
       responseCount: scores.length, averageScore: average, baseDamage: damage.base,
-      comboCount: combo, comboBonus: damage.bonus, totalDamage: damage.total,
-      hpBefore: before, hpAfter: after, attacked: true, createdAt: new Date()
+      comboCount: 0, comboBonus: 0, totalDamage: damage.total,
+      hpBefore: before, hpAfter: after, attacked: true, createdAt: new Date(),
+      bonusLearning: damage.classBonus.values.learning,
+      bonusLife: damage.classBonus.values.life,
+      bonusCooperation: damage.classBonus.values.cooperation,
+      bonusTotal: damage.bonus
     });
     challenge.currentHp = after;
     challenge.totalDamage = Number(challenge.totalDamage || 0) + damage.total;
-    challenge.comboCount = combo;
-    challenge.maxCombo = Math.max(Number(challenge.maxCombo || 0), combo);
+    challenge.comboCount = 0;
     challenge.firstAverage = history.length ? challenge.firstAverage : average;
     challenge.lastAverage = average;
     challenge.highestAverage = Math.max(Number(challenge.highestAverage || 0), average);
@@ -70,7 +69,7 @@ function attackToday() {
       eventId: Utilities.getUuid(), challengeId: challenge.challengeId,
       date: day, action: 'attack', damage: damage.total, createdAt: new Date()
     });
-    return { day, average, responseCount: scores.length, damage, combo,
+    return { day, average, responseCount: scores.length, damage, bonuses: damage.classBonus.selected,
       defeated: after === 0, challengeId: String(challenge.challengeId), dashboard: dashboard() };
   } catch (error) { publicError(error); }
   finally { lock.releaseLock(); }

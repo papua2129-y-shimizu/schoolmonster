@@ -9,8 +9,8 @@ function classBonusForDay(selected, settings) {
     learning: 'BONUS_LEARNING', life: 'BONUS_LIFE', cooperation: 'BONUS_COOPERATION'
   };
   const keys = Array.isArray(selected) ? [...new Set(selected.map(String))] : [];
-  if (keys.length > 2 || keys.some(key => !allowed[key])) {
-    throw new Error('ボーナスは3項目から2つまで選んでください。');
+  if (keys.some(key => !allowed[key])) {
+    throw new Error('ボーナスの選択を確認してください。');
   }
   const values = { learning: 0, life: 0, cooperation: 0 };
   keys.forEach(key => { values[key] = numberSetting(settings, allowed[key]); });

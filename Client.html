@@ -9,14 +9,19 @@
     DRIVE_FOLDER_ID: 'Drive画像フォルダID', RESPONSE_SHEET_NAME: '回答シート名',
     SCORE_COLUMN: '点数列（列記号または見出し）', TIMESTAMP_COLUMN: '回答日時列（列記号または見出し）',
     HP_1: '★ 初期HP', HP_2: '★★ 初期HP', HP_3: '★★★ 初期HP',
-    DAMAGE_MULTIPLIER: 'ダメージ倍率', BONUS_LEARNING: '学習面ボーナス',
-    BONUS_LIFE: '生活面ボーナス', BONUS_COOPERATION: '協力面ボーナス'
+    DAMAGE_MULTIPLIER: 'ダメージ倍率', BONUS_LEARNING: 'ボーナス1 加点',
+    BONUS_LEARNING_LABEL: 'ボーナス1 見出し', BONUS_LEARNING_DETAIL: 'ボーナス1 説明文',
+    BONUS_LIFE: 'ボーナス2 加点', BONUS_LIFE_LABEL: 'ボーナス2 見出し',
+    BONUS_LIFE_DETAIL: 'ボーナス2 説明文', BONUS_COOPERATION: 'ボーナス3 加点',
+    BONUS_COOPERATION_LABEL: 'ボーナス3 見出し', BONUS_COOPERATION_DETAIL: 'ボーナス3 説明文'
   };
-  const bonusOptions = [
-    { key: 'learning', label: '学習面', detail: '宿題・授業準備', icon: '▣', config: 'BONUS_LEARNING' },
-    { key: 'life', label: '生活面', detail: '整理整頓・切り替え', icon: '✓', config: 'BONUS_LIFE' },
-    { key: 'cooperation', label: '協力面', detail: '助け合い・めあて達成', icon: '●●●', config: 'BONUS_COOPERATION' }
-  ];
+  function bonusOptions(config) {
+    return [
+      { key: 'learning', label: config.BONUS_LEARNING_LABEL, detail: config.BONUS_LEARNING_DETAIL, icon: '▣', config: 'BONUS_LEARNING' },
+      { key: 'life', label: config.BONUS_LIFE_LABEL, detail: config.BONUS_LIFE_DETAIL, icon: '✓', config: 'BONUS_LIFE' },
+      { key: 'cooperation', label: config.BONUS_COOPERATION_LABEL, detail: config.BONUS_COOPERATION_DETAIL, icon: '●●●', config: 'BONUS_COOPERATION' }
+    ];
+  }
 
   function safe(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, char =>
@@ -100,11 +105,11 @@
       : average === null ? null : Math.round(average * Number(data.config.DAMAGE_MULTIPLIER));
     const selectedBonus = data.todayAttacked ? Number(data.todayBonuses.total || 0)
       : state.bonuses.reduce((sum, key) => {
-        const option = bonusOptions.find(item => item.key === key);
+        const option = bonusOptions(data.config).find(item => item.key === key);
         return sum + (option ? Number(data.config[option.config] || 0) : 0);
       }, 0);
     const totalDamage = baseDamage === null ? null : baseDamage + selectedBonus;
-    const bonusCards = bonusOptions.map(option => {
+    const bonusCards = bonusOptions(data.config).map(option => {
       const lockedValue = data.todayAttacked && Number(data.todayBonuses[option.key] || 0) > 0;
       const selected = data.todayAttacked ? lockedValue : state.bonuses.includes(option.key);
       const points = Number(data.config[option.config] || 0);
@@ -125,8 +130,7 @@
       <section class="stat-band"><div class="stat-label">今週のクラス平均</div><div class="chart">${data.week.map(point =>
         `<div class="bar-col ${point.date === data.day ? 'today' : ''} ${point.holiday ? 'holiday' : ''}"><div class="bar-value">${point.holiday ? '休' : point.average == null || point.average === '' ? '—' : safe(Number(Number(point.average).toFixed(1)))}</div>
         <div class="bar-track"><div class="bar" style="height:${point.average == null || point.average === '' ? 0 : Number(point.average)}%"></div></div><span>${point.label}</span></div>`).join('')}</div></section>
-      <section class="stat-band class-bonus"><div class="bonus-heading"><div class="stat-label">今日のクラスボーナス</div><span>1日2つまで</span></div>
-      <div class="bonus-grid">${bonusCards}</div><div class="damage-calc"><span>基本 <b>${baseDamage === null ? '—' : baseDamage.toLocaleString()}</b></span>
+      <section class="stat-band class-bonus"><div class="bonus-grid">${bonusCards}</div><div class="damage-calc"><span>基本 <b>${baseDamage === null ? '—' : baseDamage.toLocaleString()}</b></span>
       <i>＋</i><span>ボーナス <b class="bonus-value">+${selectedBonus.toLocaleString()}</b></span><i>＝</i>
       <span class="damage-total">合計 <b>${totalDamage === null ? '—' : totalDamage.toLocaleString()}</b> ダメージ</span></div></section></aside></main>
       <footer class="battle-footer"><div><div class="hp-row"><span>MONSTER HP</span><span><b>${current.currentHp.toLocaleString()}</b> / ${current.maxHp.toLocaleString()}</span></div>
@@ -296,8 +300,7 @@
     if (action === 'toggle-bonus') {
       const key = button.dataset.bonus;
       if (state.bonuses.includes(key)) state.bonuses = state.bonuses.filter(item => item !== key);
-      else if (state.bonuses.length < 2) state.bonuses.push(key);
-      else { toast('ボーナスは1日2つまで選べます。'); return; }
+      else state.bonuses.push(key);
       render(); return;
     }
     if (action === 'detail') { await run(() => openDetail(button.dataset.id)); return; }

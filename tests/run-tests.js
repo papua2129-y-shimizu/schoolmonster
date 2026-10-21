@@ -71,8 +71,11 @@ check('学習面と協力面のボーナスを加算', () => {
 check('同じボーナスは重複加算しない', () => {
   reset({ scores: [60] }); assert.equal(attack(['life', 'life']).damage.bonus, 50);
 });
-check('ボーナスは2つまで', () => {
-  reset({ scores: [60] }); assert.throws(() => attack(['learning', 'life', 'cooperation']), /2つまで/);
+check('3つのボーナスを同時に選べる', () => {
+  reset({ scores: [60] }); assert.equal(attack(['learning', 'life', 'cooperation']).damage.bonus, 250);
+});
+check('不明なボーナスは拒否する', () => {
+  reset({ scores: [60] }); assert.throws(() => attack(['unknown']), /選択/);
 });
 check('月曜が休日なら火曜は前週金曜を直前の登校日とする', () => {
   config.HOLIDAYS = '2026-09-21';

@@ -17,9 +17,9 @@
   };
   function bonusOptions(config) {
     return [
-      { key: 'learning', label: config.BONUS_LEARNING_LABEL, detail: config.BONUS_LEARNING_DETAIL, icon: '▣', config: 'BONUS_LEARNING' },
-      { key: 'life', label: config.BONUS_LIFE_LABEL, detail: config.BONUS_LIFE_DETAIL, icon: '✓', config: 'BONUS_LIFE' },
-      { key: 'cooperation', label: config.BONUS_COOPERATION_LABEL, detail: config.BONUS_COOPERATION_DETAIL, icon: '●●●', config: 'BONUS_COOPERATION' }
+      { key: 'learning', label: config.BONUS_LEARNING_LABEL, detail: config.BONUS_LEARNING_DETAIL, icon: window.SUKUMON_BONUS_ICONS.learning, config: 'BONUS_LEARNING' },
+      { key: 'life', label: config.BONUS_LIFE_LABEL, detail: config.BONUS_LIFE_DETAIL, icon: window.SUKUMON_BONUS_ICONS.life, config: 'BONUS_LIFE' },
+      { key: 'cooperation', label: config.BONUS_COOPERATION_LABEL, detail: config.BONUS_COOPERATION_DETAIL, icon: window.SUKUMON_BONUS_ICONS.cooperation, config: 'BONUS_COOPERATION' }
     ];
   }
 
@@ -115,7 +115,7 @@
       const points = Number(data.config[option.config] || 0);
       return `<button class="bonus-card ${selected ? 'selected' : ''}" data-action="toggle-bonus" data-bonus="${option.key}"
         aria-pressed="${selected}" ${data.todayAttacked ? 'disabled' : ''}><span class="bonus-check">${selected ? '✓' : ''}</span>
-        <span class="bonus-icon">${option.icon}</span><strong>${option.label}</strong><small>${option.detail}</small><b>+${points}</b></button>`;
+        <span class="bonus-icon"><img src="${option.icon}" alt=""></span><strong>${option.label}</strong><small>${option.detail}</small><b>+${points}</b></button>`;
     }).join('');
     return shell(`<main class="main-stage"><section class="monster-side"><div class="monster-head"><div>
       <div class="eyebrow">CURRENT BATTLE · ${safe(current.startDate)}</div>

@@ -119,3 +119,9 @@ for (const name of ['DataService.gs', 'WebApp.gs']) {
 const client = fs.readFileSync(path.join(root, 'Client.html'), 'utf8');
 new vm.Script(client.replace(/^<script>\s*|\s*<\/script>\s*$/g, ''), { filename: 'Client.html' });
 process.stdout.write('PASS Client.html 構文\n');
+assert.match(fs.readFileSync(path.join(root, 'Index.html'), 'utf8'), /include\('IconAssets'\)/);
+assert.match(client, /SUKUMON_BONUS_ICONS\.learning/);
+assert.match(client, /class="bonus-icon"><img/);
+const icons = fs.readFileSync(path.join(root, 'IconAssets.html'), 'utf8');
+new vm.Script(icons.replace(/^<script>\s*|\s*<\/script>\s*$/g, ''), { filename: 'IconAssets.html' });
+process.stdout.write('PASS ボーナス画像アイコン\n');

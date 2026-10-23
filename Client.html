@@ -91,6 +91,11 @@
     const average = data.preview.average;
     const shownAverage = data.todayAttacked && data.week.some(point => point.date === data.day)
       ? (data.week.find(point => point.date === data.day) || {}).average : average;
+    const scoresRevealed = data.todayAttacked || data.preview.complete;
+    const responseCount = data.todayAttacked ? Number(data.todayResponseCount || 0) : Number(data.preview.responseCount || 0);
+    const expectedCount = Number(data.preview.expectedCount || data.config.CLASS_SIZE || 1);
+    const remainingCount = Math.max(0, Number(data.preview.remainingCount || 0));
+    const responseRate = Math.min(100, Math.round(responseCount / Math.max(1, expectedCount) * 100));
     const baseDamage = data.todayAttacked ? data.todayBaseDamage
       : average === null ? null : Math.round(average * Number(data.config.DAMAGE_MULTIPLIER));
     const selectedBonus = data.todayAttacked ? Number(data.todayBonuses.total || 0)
@@ -107,27 +112,36 @@
         aria-pressed="${selected}" ${data.todayAttacked ? 'disabled' : ''}><span class="bonus-check">${selected ? '✓' : ''}</span>
         <span class="bonus-icon"><img src="${option.icon}" alt=""></span><strong>${option.label}</strong><small>${option.detail}</small><b>+${points}</b></button>`;
     }).join('');
+    const revealState = data.todayAttacked ? 'attacked' : data.preview.complete ? 'ready' : 'waiting';
+    const revealLabel = data.todayAttacked ? '本日の攻撃完了' : data.preview.complete ? '攻撃準備完了！' : 'みんなの力を集めています';
+    const responseMessage = data.preview.error ? safe(data.preview.error)
+      : data.todayAttacked ? 'この人数で集計しました'
+        : data.preview.complete ? '全員の回答がそろいました' : `あと${remainingCount}人で攻撃準備完了`;
+    const attackLabel = data.todayAttacked ? `今日の攻撃済み · ${Number(data.todayDamage).toLocaleString()}`
+      : data.preview.complete ? '攻撃する' : responseCount ? `現在の${responseCount}人で攻撃` : '回答を待っています';
     return shell(`<main class="main-stage"><section class="monster-side"><div class="monster-head"><div>
       <div class="eyebrow">CURRENT BATTLE · ${safe(current.startDate)}</div>
       <h1 class="title">${safe(current.name)}</h1></div><div class="stars" aria-label="強さ${current.difficulty}">${'★'.repeat(current.difficulty)}</div></div>
       <div class="monster-scene ${sceneClass}" id="monster-scene">${image(current.monsterId)}
       ${hpRate > 0 && hpRate <= .1 ? '<div class="near">あと少し！</div>' : ''}</div></section>
-      <aside class="side-stats"><section class="stat-band"><div class="stat-label">今日のクラス平均</div>
-      <div class="avg-line"><div class="hero-number">${shownAverage == null || shownAverage === '' ? '—' : safe(Number(Number(shownAverage).toFixed(1)))}<small>点</small></div>
+      <aside class="side-stats"><section class="stat-band reveal-panel ${revealState}"><div class="reveal-heading"><div class="stat-label">今日のクラス平均</div>
+      <span class="reveal-badge">${revealLabel}</span></div>
+      <div class="avg-line"><div class="hero-number ${scoresRevealed ? '' : 'concealed'}">${scoresRevealed && shownAverage != null && shownAverage !== '' ? safe(Number(Number(shownAverage).toFixed(1))) : '？'}${scoresRevealed ? '<small>点</small>' : ''}</div>
       <div><div class="stat-label">基本ダメージ</div>
-      <div class="damage">${baseDamage === null ? '—' : safe(baseDamage.toLocaleString())}</div></div></div>
-      <div class="muted small">${data.preview.error ? safe(data.preview.error) : `${data.preview.responseCount}人が回答`}</div></section>
+      <div class="damage">${scoresRevealed && baseDamage !== null ? safe(baseDamage.toLocaleString()) : '？'}</div></div></div>
+      <div class="response-line"><b>回答済み ${responseCount} / ${expectedCount}人</b><span>${responseMessage}</span></div>
+      <div class="response-track" aria-label="回答進捗"><span style="width:${responseRate}%"></span></div></section>
       <section class="stat-band"><div class="stat-label">今週のクラス平均</div><div class="chart">${data.week.map(point =>
         `<div class="bar-col ${point.date === data.day ? 'today' : ''} ${point.holiday ? 'holiday' : ''}"><div class="bar-value">${point.holiday ? '休' : point.average == null || point.average === '' ? '—' : safe(Number(Number(point.average).toFixed(1)))}</div>
         <div class="bar-track"><div class="bar" style="height:${point.average == null || point.average === '' ? 0 : Number(point.average)}%"></div></div><span>${point.label}</span></div>`).join('')}</div></section>
-      <section class="stat-band class-bonus"><div class="bonus-grid">${bonusCards}</div><div class="damage-calc"><span>基本 <b>${baseDamage === null ? '—' : baseDamage.toLocaleString()}</b></span>
+      <section class="stat-band class-bonus"><div class="bonus-grid">${bonusCards}</div><div class="damage-calc"><span>基本 <b>${scoresRevealed && baseDamage !== null ? baseDamage.toLocaleString() : '？'}</b></span>
       <i>＋</i><span>ボーナス <b class="bonus-value">+${selectedBonus.toLocaleString()}</b></span><i>＝</i>
-      <span class="damage-total">合計 <b>${totalDamage === null ? '—' : totalDamage.toLocaleString()}</b> ダメージ</span></div></section></aside></main>
+      <span class="damage-total">合計 <b>${scoresRevealed && totalDamage !== null ? totalDamage.toLocaleString() : '？'}</b> ダメージ</span></div></section></aside></main>
       <footer class="battle-footer"><div><div class="hp-row"><span>MONSTER HP</span><span><b>${current.currentHp.toLocaleString()}</b> / ${current.maxHp.toLocaleString()}</span></div>
       <div class="hp-track" role="progressbar" aria-label="モンスターHP" aria-valuenow="${current.currentHp}" aria-valuemax="${current.maxHp}">
       <div class="hp-fill ${hpRate <= .1 ? 'critical' : hpRate <= .25 ? 'low' : ''}" style="width:${Math.max(0, hpRate * 100)}%"></div></div></div>
-      <button class="btn primary attack" data-action="attack" data-mutate ${data.todayAttacked || average === null ? 'disabled' : ''}>
-      ${data.todayAttacked ? `今日の攻撃済み · ${Number(data.todayDamage).toLocaleString()}` : '攻撃する'}</button></footer>`);
+      <button class="btn ${data.preview.complete ? 'primary' : 'current-count'} attack" data-action="attack" data-mutate ${data.todayAttacked || responseCount === 0 ? 'disabled' : ''}>
+      ${attackLabel}</button></footer>`);
   }
   function encyclopediaView() {
     const monsters = state.data.monsters;
@@ -183,21 +197,24 @@
       <div class="connection-grid">${input('DRIVE_FOLDER_ID', 'Drive画像フォルダID')}${input('RESPONSE_SHEET_NAME', '回答シート名')}
       ${input('SCORE_COLUMN', '点数列')}${input('TIMESTAMP_COLUMN', '回答日時列')}</div>
       <div class="section-actions"><button class="btn" data-action="sync" data-mutate>モンスター画像を再読込</button></div></section>
-      <section class="settings-section battle-settings"><header><span class="section-mark">02</span><div><h2>バトル計算</h2><p>強さ別HP・ダメージ・効果音</p></div></header>
+      <section class="settings-section response-settings"><header><span class="section-mark">02</span><div><h2>回答と公開</h2><p>全員がそろうまで得点を隠します</p></div></header>
+      <div class="response-settings-grid">${input('CLASS_SIZE', 'クラスの人数', 'type="number" min="1" step="1"')}
+      <div class="setting-note"><b>公開のルール</b><span>この人数が回答すると、得点とダメージが自動で現れます。</span></div></div></section>
+      <section class="settings-section battle-settings"><header><span class="section-mark">03</span><div><h2>バトル計算</h2><p>強さ別HP・ダメージ・効果音</p></div></header>
       <div class="hp-settings">${input('HP_1', '★ 初期HP')}${input('HP_2', '★★ 初期HP')}${input('HP_3', '★★★ 初期HP')}</div>
       <div class="battle-options">${input('DAMAGE_MULTIPLIER', 'ダメージ倍率')}
       <label class="field">効果音<select name="SOUND_ON"><option value="true" ${config.SOUND_ON === true || config.SOUND_ON === 'true' ? 'selected' : ''}>ON</option>
       <option value="false" ${config.SOUND_ON === false || config.SOUND_ON === 'false' ? 'selected' : ''}>OFF</option></select></label></div></section>
-      <section class="settings-section bonus-settings"><header><span class="section-mark">03</span><div><h2>クラスボーナス</h2><p>各ボタンの加点・見出し・説明文</p></div></header>
+      <section class="settings-section bonus-settings"><header><span class="section-mark">04</span><div><h2>クラスボーナス</h2><p>各ボタンの加点・見出し・説明文</p></div></header>
       <div class="bonus-settings-list">${bonusRow(1, 'learning', 'BONUS_LEARNING', 'BONUS_LEARNING_LABEL', 'BONUS_LEARNING_DETAIL')}
       ${bonusRow(2, 'life', 'BONUS_LIFE', 'BONUS_LIFE_LABEL', 'BONUS_LIFE_DETAIL')}
       ${bonusRow(3, 'cooperation', 'BONUS_COOPERATION', 'BONUS_COOPERATION_LABEL', 'BONUS_COOPERATION_DETAIL')}</div></section>
-      <section class="settings-section holiday-settings"><header><span class="section-mark">04</span><div><h2>休日設定</h2><p>土日は自動で休みです</p></div></header>
+      <section class="settings-section holiday-settings"><header><span class="section-mark">05</span><div><h2>休日設定</h2><p>土日は自動で休みです</p></div></header>
       <input type="hidden" name="HOLIDAYS" value="${safe(holidays.join(','))}"><div class="holiday-add">
       <label class="field">休日にする日<input id="holiday-date" type="date"></label>
       <button class="btn" type="button" data-action="add-holiday">追加</button></div>
       <div class="holiday-list">${holidays.length ? holidays.map(date => `<span>${safe(date)}<button type="button" data-action="remove-holiday" data-date="${safe(date)}" aria-label="${safe(date)}を削除">×</button></span>`).join('') : '<span class="muted">登録された休日はありません。</span>'}</div></section>
-      <section class="settings-section challenge-settings"><header><span class="section-mark">05</span><div><h2>現在の挑戦</h2><p>進行中のバトルにだけ反映されます</p></div></header>
+      <section class="settings-section challenge-settings"><header><span class="section-mark">06</span><div><h2>現在の挑戦</h2><p>進行中のバトルにだけ反映されます</p></div></header>
       <div class="challenge-controls"><label class="field">現在HP<input id="manual-hp" type="number" min="1" max="${state.data.current ? state.data.current.maxHp : 1}" value="${state.data.current ? state.data.current.currentHp : ''}"></label>
       <button class="btn" data-action="adjust-hp" data-mutate ${state.data.current ? '' : 'disabled'}>HPを修正</button>
       <button class="btn" data-action="undo" data-mutate>今日の攻撃を取り消す</button>
@@ -326,6 +343,11 @@
       await run(async () => { await api('startChallenge', state.detail.monster.monsterId, state.difficulty); state.page = 'main'; await refresh(); }); return;
     }
     if (action === 'attack') {
+      if (!state.data.preview.complete && !state.data.todayAttacked) {
+        const count = Number(state.data.preview.responseCount || 0);
+        const remaining = Number(state.data.preview.remainingCount || 0);
+        if (!confirm(`まだ${remaining}人が未回答です。現在の${count}人の回答で攻撃しますか？`)) return;
+      }
       sound('charge');
       document.getElementById('monster-scene')?.classList.add('strike');
       await run(async () => {
@@ -367,5 +389,10 @@
     }
   });
   refresh().catch(error => setupView(error && error.message));
+  setInterval(() => {
+    if (state.page === 'main' && !state.busy && state.data?.current && !state.data.todayAttacked) {
+      refresh().catch(() => {});
+    }
+  }, 10000);
 })();
 </script>

@@ -11,6 +11,7 @@ const DEFAULTS = Object.freeze({
   RESPONSE_SHEET_NAME: '',
   SCORE_COLUMN: '',
   TIMESTAMP_COLUMN: '',
+  CLASS_SIZE: 24,
   HP_1: 7000,
   HP_2: 8500,
   HP_3: 10000,

@@ -4,6 +4,12 @@ function averageScore(scores) {
   return scores.reduce((sum, score) => sum + score, 0) / scores.length;
 }
 
+function responseReadiness(responseCount, expectedCount) {
+  const count = Math.max(0, Math.floor(Number(responseCount) || 0));
+  const target = Math.max(1, Math.floor(Number(expectedCount) || 0));
+  return { count, target, remaining: Math.max(0, target - count), complete: count >= target };
+}
+
 function classBonusForDay(selected, settings) {
   const allowed = {
     learning: 'BONUS_LEARNING', life: 'BONUS_LIFE', cooperation: 'BONUS_COOPERATION'

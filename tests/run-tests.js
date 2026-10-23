@@ -11,7 +11,7 @@ let sequence = 0;
 const config = {
   HP_1: 7000, HP_2: 8500, HP_3: 10000, DAMAGE_MULTIPLIER: 20,
   BONUS_LEARNING: 100, BONUS_LIFE: 50, BONUS_COOPERATION: 100,
-  DRIVE_FOLDER_ID: 'folder', HOLIDAYS: ''
+  DRIVE_FOLDER_ID: 'folder', HOLIDAYS: '', CLASS_SIZE: 24
 };
 const context = vm.createContext({
   console: { error() {} }, Date, Math, Number, String, Array, Object,
@@ -55,6 +55,14 @@ function history(date, average, bonuses = {}) {
 function check(name, task) { task(); process.stdout.write(`PASS ${name}\n`); }
 
 check('0件の日は攻撃できない', () => { reset(); assert.throws(attack, /今日の回答/); });
+check('全員そろうまで得点を隠す', () => {
+  assert.equal(JSON.stringify(context.responseReadiness(23, 24)),
+    JSON.stringify({ count: 23, target: 24, remaining: 1, complete: false }));
+});
+check('全員そろうと攻撃準備完了', () => {
+  assert.equal(JSON.stringify(context.responseReadiness(24, 24)),
+    JSON.stringify({ count: 24, target: 24, remaining: 0, complete: true }));
+});
 check('1件の日はその回答を平均にする', () => { reset({ scores: [80] }); assert.equal(attack().damage.total, 1600); });
 check('24人全員の平均', () => { reset({ scores: Array(24).fill(75) }); assert.equal(attack().average, 75); });
 check('欠席者がいても回答者だけで平均', () => { reset({ scores: Array(23).fill(70) }); assert.equal(attack().responseCount, 23); });
@@ -123,8 +131,11 @@ assert.match(fs.readFileSync(path.join(root, 'Index.html'), 'utf8'), /include\('
 assert.match(client, /SUKUMON_BONUS_ICONS\.learning/);
 assert.match(client, /class="bonus-icon"><img/);
 assert.match(client, /class="bonus-setting-grid"/);
+assert.match(client, /現在の\$\{responseCount\}人で攻撃/);
+assert.match(client, /setInterval/);
 const styles = fs.readFileSync(path.join(root, 'Styles.html'), 'utf8');
 assert.match(styles, /grid-template-columns:minmax\(110px,.45fr\) minmax\(180px,.8fr\) minmax\(260px,1.5fr\)/);
+assert.match(styles, /\.reveal-panel\.ready/);
 const icons = fs.readFileSync(path.join(root, 'IconAssets.html'), 'utf8');
 new vm.Script(icons.replace(/^<script>\s*|\s*<\/script>\s*$/g, ''), { filename: 'IconAssets.html' });
 process.stdout.write('PASS ボーナス画像アイコン\n');

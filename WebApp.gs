@@ -16,12 +16,16 @@ function dashboard() {
     const config = settings();
     const monsters = monsterList();
     const allChallenges = rows('Challenges');
-    let preview = { average: null, responseCount: 0, error: '' };
+    let preview = { average: null, responseCount: 0, expectedCount: Number(config.CLASS_SIZE),
+      remainingCount: Number(config.CLASS_SIZE), complete: false, error: '' };
     try {
       if (!isSchoolDay(day, config)) preview.error = '今日は休日に設定されています。';
       else {
         const scores = scoresForDate(day, config);
-        preview = { average: averageScore(scores), responseCount: scores.length,
+        const readiness = responseReadiness(scores.length, config.CLASS_SIZE);
+        preview = { average: readiness.complete ? averageScore(scores) : null,
+          responseCount: readiness.count, expectedCount: readiness.target,
+          remainingCount: readiness.remaining, complete: readiness.complete,
           error: scores.length ? '' : '今日の回答がまだありません。' };
       }
     } catch (error) { preview.error = error.message; }
@@ -45,6 +49,7 @@ function dashboard() {
       } : null,
       todayDamage: todayAttack ? Number(todayAttack.totalDamage) : null,
       todayBaseDamage: todayAttack ? Number(todayAttack.baseDamage) : null,
+      todayResponseCount: todayAttack ? Number(todayAttack.responseCount) : null,
       todayBonuses: todayAttack ? {
         learning: Number(todayAttack.bonusLearning || 0), life: Number(todayAttack.bonusLife || 0),
         cooperation: Number(todayAttack.bonusCooperation || 0), total: Number(todayAttack.bonusTotal || 0)

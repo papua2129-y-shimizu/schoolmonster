@@ -60,7 +60,10 @@ function saveSettings(input) {
       const value = input[key];
       if (typeof DEFAULTS[key] === 'number') {
         if (value === '' || !Number.isFinite(Number(value)) || Number(value) < 0) throw new Error('設定値が正しくありません: ' + key);
-        if (/^(HP_|BONUS_)/.test(key) && !Number.isInteger(Number(value))) throw new Error('設定値が正しくありません: ' + key);
+        if ((/^(HP_|BONUS_)/.test(key) || key === 'CLASS_SIZE') && !Number.isInteger(Number(value))) {
+          throw new Error('設定値が正しくありません: ' + key);
+        }
+        if (key === 'CLASS_SIZE' && Number(value) < 1) throw new Error('設定値が正しくありません: ' + key);
         next[key] = Number(value);
       } else if (typeof DEFAULTS[key] === 'boolean') {
         next[key] = value === true || value === 'true';

@@ -69,6 +69,10 @@ function dashboard() {
   } catch (error) { publicError(error); }
 }
 
+function dashboardJson() {
+  return JSON.stringify(dashboard());
+}
+
 function battleResult(challengeId) {
   try {
     const challenge = rows('Challenges').find(row => row.challengeId === challengeId);

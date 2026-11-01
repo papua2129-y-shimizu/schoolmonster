@@ -6,10 +6,11 @@
   const toastNode = document.getElementById('toast');
   const labels = { new: '未挑戦', active: '挑戦中', defeated: '討伐済', retry: '再挑戦可能' };
   function bonusOptions(config) {
+    const icons = window.SUKUMON_BONUS_ICONS || {};
     return [
-      { key: 'learning', label: config.BONUS_LEARNING_LABEL, detail: config.BONUS_LEARNING_DETAIL, icon: window.SUKUMON_BONUS_ICONS.learning, config: 'BONUS_LEARNING' },
-      { key: 'life', label: config.BONUS_LIFE_LABEL, detail: config.BONUS_LIFE_DETAIL, icon: window.SUKUMON_BONUS_ICONS.life, config: 'BONUS_LIFE' },
-      { key: 'cooperation', label: config.BONUS_COOPERATION_LABEL, detail: config.BONUS_COOPERATION_DETAIL, icon: window.SUKUMON_BONUS_ICONS.cooperation, config: 'BONUS_COOPERATION' }
+      { key: 'learning', label: config.BONUS_LEARNING_LABEL, detail: config.BONUS_LEARNING_DETAIL, icon: icons.learning || '', config: 'BONUS_LEARNING' },
+      { key: 'life', label: config.BONUS_LIFE_LABEL, detail: config.BONUS_LIFE_DETAIL, icon: icons.life || '', config: 'BONUS_LIFE' },
+      { key: 'cooperation', label: config.BONUS_COOPERATION_LABEL, detail: config.BONUS_COOPERATION_DETAIL, icon: icons.cooperation || '', config: 'BONUS_COOPERATION' }
     ];
   }
 
@@ -18,8 +19,12 @@
       ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
   }
   function api(method, ...args) {
-    return new Promise((resolve, reject) => google.script.run
-      .withSuccessHandler(resolve).withFailureHandler(reject)[method](...args));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('通信に時間がかかっています。もう一度読み込んでください。')), 15000);
+      google.script.run
+        .withSuccessHandler(value => { clearTimeout(timer); resolve(value); })
+        .withFailureHandler(error => { clearTimeout(timer); reject(error); })[method](...args);
+    });
   }
   function toast(message) {
     toastNode.textContent = message;
@@ -36,8 +41,16 @@
     finally { state.busy = false; root.querySelectorAll('[data-mutate]').forEach(button => { button.disabled = false; }); }
   }
   async function refresh() {
-    state.data = await api('dashboard');
+    const payload = await api('dashboardJson');
+    state.data = JSON.parse(payload);
     render();
+  }
+  function startupView(message = '') {
+    root.innerHTML = `<div class="app-shell"><main class="empty-state startup-state">
+      <div class="startup-mark" aria-hidden="true">SM</div><h1>スクモン討伐アプリ</h1>
+      ${message ? `<p>${safe(message)}</p><button class="btn primary" data-action="retry-load">もう一度読み込む</button>`
+        : '<p>クラスの記録を読み込んでいます...</p><div class="startup-loader" aria-label="読み込み中"></div>'}
+      </main></div>`;
   }
   function shell(content) {
     return `<div class="app-shell"><header class="topbar"><div class="brand">スク<span>モン</span>討伐</div>
@@ -110,7 +123,7 @@
       const points = Number(data.config[option.config] || 0);
       return `<button class="bonus-card ${selected ? 'selected' : ''}" data-action="toggle-bonus" data-bonus="${option.key}"
         aria-pressed="${selected}" ${data.todayAttacked ? 'disabled' : ''}><span class="bonus-check">${selected ? '✓' : ''}</span>
-        <span class="bonus-icon"><img src="${option.icon}" alt=""></span><strong>${option.label}</strong><small>${option.detail}</small><b>+${points}</b></button>`;
+        <span class="bonus-icon">${option.icon ? `<img src="${option.icon}" alt="">` : '<span class="bonus-fallback" aria-hidden="true">+</span>'}</span><strong>${safe(option.label)}</strong><small>${safe(option.detail)}</small><b>+${points}</b></button>`;
     }).join('');
     const revealState = data.todayAttacked ? 'attacked' : data.preview.complete ? 'ready' : 'waiting';
     const revealLabel = data.todayAttacked ? '本日の攻撃完了' : data.preview.complete ? '攻撃準備完了！' : 'みんなの力を集めています';
@@ -246,9 +259,14 @@
   }
   function render() {
     if (!state.data) return;
-    root.innerHTML = state.page === 'encyclopedia' ? encyclopediaView() : state.page === 'detail' ? detailView()
-      : state.page === 'settings' ? settingsView() : state.page === 'result' ? resultView() : mainView();
-    loadImages();
+    try {
+      root.innerHTML = state.page === 'encyclopedia' ? encyclopediaView() : state.page === 'detail' ? detailView()
+        : state.page === 'settings' ? settingsView() : state.page === 'result' ? resultView() : mainView();
+      loadImages();
+    } catch (error) {
+      console.error(error);
+      startupView('画面の表示中に問題が起きました。再読み込みしてください。');
+    }
   }
   function sound(kind) {
     if (!state.data || !(state.data.config.SOUND_ON === true || state.data.config.SOUND_ON === 'true')) return;
@@ -311,6 +329,11 @@
     if (!button || button.disabled) return;
     const action = button.dataset.action;
     if (action === 'main' || action === 'settings') { state.page = action; render(); return; }
+    if (action === 'retry-load') {
+      startupView();
+      refresh().catch(error => startupView(error && error.message ? error.message : 'データを読み込めませんでした。'));
+      return;
+    }
     if (action === 'encyclopedia') { state.page = 'encyclopedia'; state.pageIndex = -1; render(); return; }
     if (action === 'book-open') { state.pageIndex = 0; render(); return; }
     if (action === 'book-prev') { state.pageIndex--; render(); return; }
@@ -388,7 +411,8 @@
       await run(async () => { await api('cancelChallenge'); state.page = 'main'; await refresh(); });
     }
   });
-  refresh().catch(error => setupView(error && error.message));
+  startupView();
+  refresh().catch(error => startupView(error && error.message ? error.message : 'データを読み込めませんでした。'));
   setInterval(() => {
     if (state.page === 'main' && !state.busy && state.data?.current && !state.data.todayAttacked) {
       refresh().catch(() => {});

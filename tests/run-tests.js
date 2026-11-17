@@ -120,6 +120,37 @@ check('攻撃取消でHPと状態を復元', () => {
   assert.equal(data.DailyStats.length, 0);
 });
 
+check('名簿と当日の回答から未回答番号を判定する', () => {
+  const responseRows = [
+    ['タイムスタンプ', '今日、自分はこのスクモンにどのくらい勝てましたか？', 'メールアドレス'],
+    [new Date('2026-09-18T01:00:00Z'), 60, 'A@school.jp'],
+    [new Date('2026-09-18T02:00:00Z'), 80, ' a@school.jp '],
+    [new Date('2026-09-17T02:00:00Z'), 90, 'b@school.jp']
+  ];
+  let rosterRows = [
+    ['出席番号', 'メールアドレス', '在籍'],
+    [3, 'a@school.jp', true], [1, 'b@school.jp', 'TRUE'],
+    [2, 'c@school.jp', true], [4, 'd@school.jp', false]
+  ];
+  const responseSheet = { getDataRange: () => ({ getValues: () => responseRows }) };
+  const rosterSheet = { getLastRow: () => rosterRows.length, getRange: () => ({ getValues: () => rosterRows }) };
+  const dataContext = vm.createContext({
+    Date, Map, Set, Number, String,
+    SCORE_QUESTION: responseRows[0][1],
+    dateKey: value => value instanceof Date ? value.toISOString().slice(0, 10) : String(value).slice(0, 10),
+    dataBook: () => ({ getSheetByName: name => name === '児童名簿番号だけ' ? rosterSheet : null })
+  });
+  vm.runInContext(fs.readFileSync(path.join(root, 'DataService.gs'), 'utf8'), dataContext);
+  dataContext.responseSheet = () => responseSheet;
+  dataContext.dataBook = () => ({ getSheetByName: name => name === '児童名簿番号だけ' ? rosterSheet : null });
+  const responses = dataContext.responsesForDate('2026-09-18', {});
+  assert.equal(responses.length, 1);
+  assert.equal(responses[0].score, 80);
+  assert.equal(JSON.stringify(dataContext.missingNumbersForDate(responses).numbers), '[1,2]');
+  rosterRows = [['出席番号', 'メールアドレス', '在籍'], [1, 'a@school.jp', true], [2, 'a@school.jp', true]];
+  assert.throws(() => dataContext.missingNumbersForDate(responses), /番号・メールアドレス/);
+});
+
 for (const name of ['DataService.gs', 'WebApp.gs']) {
   new vm.Script(fs.readFileSync(path.join(root, name), 'utf8'), { filename: name });
   process.stdout.write(`PASS ${name} 構文\n`);
@@ -140,6 +171,9 @@ assert.match(client, /画面の表示中に問題が起きました/);
 assert.match(client, /class="bonus-setting-grid"/);
 assert.match(client, /現在の\$\{responseCount\}人で攻撃/);
 assert.match(client, /setInterval/);
+assert.match(client, /missing-accordion/);
+assert.match(client, /data\.preview\.error !== '今日の回答がまだありません。'/);
+assert.match(client, /state\.missingOpen = event\.target\.open/);
 const styles = fs.readFileSync(path.join(root, 'Styles.html'), 'utf8');
 assert.match(styles, /grid-template-columns:minmax\(110px,.45fr\) minmax\(180px,.8fr\) minmax\(260px,1.5fr\)/);
 assert.match(styles, /\.reveal-panel\.ready/);

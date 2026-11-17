@@ -165,7 +165,7 @@ function columnIndex(spec, headers, candidates) {
   return headers.findIndex(header => candidates.some(candidate => candidate === header));
 }
 
-function scoresForDate(day, config) {
+function responsesForDate(day, config) {
   const sheet = responseSheet(config);
   const data = sheet.getDataRange().getValues();
   if (data.length < 2) return [];
@@ -189,5 +189,33 @@ function scoresForDate(day, config) {
       latest.set(email, { score, timestamp: Number.isFinite(timestamp) ? timestamp : index });
     }
   });
-  return [...latest.values()].map(item => item.score);
+  return [...latest].map(([email, item]) => ({ email, score: item.score }));
+}
+
+function scoresForDate(day, config) {
+  return responsesForDate(day, config).map(item => item.score);
+}
+
+function missingNumbersForDate(responses) {
+  const sheet = dataBook().getSheetByName('児童名簿番号だけ');
+  if (!sheet || sheet.getLastRow() === 0) throw new Error('児童名簿番号だけ シートがありません。');
+  const values = sheet.getRange(1, 1, sheet.getLastRow(), 3).getValues();
+  if (values.length < 2 || values[0][0] !== '出席番号' || values[0][1] !== 'メールアドレス' || values[0][2] !== '在籍') {
+    throw new Error('児童名簿番号だけ のA～C列の見出しを確認してください。');
+  }
+  const roster = values.slice(1).filter(row => row.some(value => value !== ''));
+  const active = roster.filter(row => row[2] === true || String(row[2]).trim().toUpperCase() === 'TRUE');
+  const numbers = active.map(row => String(row[0]).trim());
+  const emails = active.map(row => String(row[1]).trim().toLowerCase());
+  if (!active.length || numbers.some(number => !/^\d+$/.test(number)) || emails.some(email => !email.includes('@')) ||
+      new Set(numbers).size !== numbers.length || new Set(emails).size !== emails.length) {
+    throw new Error('児童名簿番号だけ の在籍児童の番号・メールアドレスを確認してください。');
+  }
+  const answered = new Set(responses.map(item => item.email));
+  return {
+    numbers: active.filter((row, index) => !answered.has(emails[index]))
+      .map(row => Number(row[0])).sort((a, b) => a - b),
+    rosterCount: active.length,
+    unmatchedCount: responses.filter(item => !emails.includes(item.email)).length
+  };
 }

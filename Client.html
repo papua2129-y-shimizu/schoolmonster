@@ -1,7 +1,7 @@
 <script>
 (() => {
   const state = { page: 'main', data: null, detail: null, result: null, pageIndex: 0,
-    difficulty: 1, imageCache: {}, busy: false, audio: null, bonuses: [] };
+    difficulty: 1, imageCache: {}, busy: false, audio: null, bonuses: [], missingOpen: false };
   const root = document.getElementById('app');
   const toastNode = document.getElementById('toast');
   const labels = { new: '未挑戦', active: '挑戦中', defeated: '討伐済', retry: '再挑戦可能' };
@@ -109,6 +109,16 @@
     const expectedCount = Number(data.preview.expectedCount || data.config.CLASS_SIZE || 1);
     const remainingCount = Math.max(0, Number(data.preview.remainingCount || 0));
     const responseRate = Math.min(100, Math.round(responseCount / Math.max(1, expectedCount) * 100));
+    const missing = data.preview.missingNumbers || [];
+    const missingPanel = data.preview.error && data.preview.error !== '今日の回答がまだありません。' ? '' : data.preview.rosterError
+      ? `<details class="missing-accordion" ${state.missingOpen ? 'open' : ''}><summary>名簿を確認 <span aria-hidden="true">⌄</span></summary>
+        <div class="missing-content">${safe(data.preview.rosterError)}</div></details>`
+      : `<details class="missing-accordion" ${state.missingOpen ? 'open' : ''}>
+        <summary>${missing.length ? `未回答 ${missing.length}人 · 番号を確認` : '全員回答済み'} <span aria-hidden="true">⌄</span></summary>
+        <div class="missing-content">${missing.length ? `<div class="missing-numbers" aria-label="未回答の出席番号">${missing.map(number =>
+          `<span>${safe(number)}番</span>`).join('')}</div>` : '在籍児童の回答がそろっています。'}
+          ${data.preview.unmatchedCount ? `<p class="missing-note">名簿にない回答 ${safe(data.preview.unmatchedCount)}件。名簿のメールアドレスを確認してください。</p>` : ''}
+        </div></details>`;
     const baseDamage = data.todayAttacked ? data.todayBaseDamage
       : average === null ? null : Math.round(average * Number(data.config.DAMAGE_MULTIPLIER));
     const selectedBonus = data.todayAttacked ? Number(data.todayBonuses.total || 0)
@@ -143,7 +153,8 @@
       <div><div class="stat-label">基本ダメージ</div>
       <div class="damage">${scoresRevealed && baseDamage !== null ? safe(baseDamage.toLocaleString()) : '？'}</div></div></div>
       <div class="response-line"><b>回答済み ${responseCount} / ${expectedCount}人</b><span>${responseMessage}</span></div>
-      <div class="response-track" aria-label="回答進捗"><span style="width:${responseRate}%"></span></div></section>
+      <div class="response-track" aria-label="回答進捗"><span style="width:${responseRate}%"></span></div>
+      ${missingPanel}</section>
       <section class="stat-band"><div class="stat-label">今週のクラス平均</div><div class="chart">${data.week.map(point =>
         `<div class="bar-col ${point.date === data.day ? 'today' : ''} ${point.holiday ? 'holiday' : ''}"><div class="bar-value">${point.holiday ? '休' : point.average == null || point.average === '' ? '—' : safe(Number(Number(point.average).toFixed(1)))}</div>
         <div class="bar-track"><div class="bar" style="height:${point.average == null || point.average === '' ? 0 : Number(point.average)}%"></div></div><span>${point.label}</span></div>`).join('')}</div></section>
@@ -411,6 +422,9 @@
       await run(async () => { await api('cancelChallenge'); state.page = 'main'; await refresh(); });
     }
   });
+  root.addEventListener('toggle', event => {
+    if (event.target.matches('.missing-accordion')) state.missingOpen = event.target.open;
+  }, true);
   startupView();
   refresh().catch(error => startupView(error && error.message ? error.message : 'データを読み込めませんでした。'));
   setInterval(() => {

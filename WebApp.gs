@@ -17,16 +17,24 @@ function dashboard() {
     const monsters = monsterList();
     const allChallenges = rows('Challenges');
     let preview = { average: null, responseCount: 0, expectedCount: Number(config.CLASS_SIZE),
-      remainingCount: Number(config.CLASS_SIZE), complete: false, error: '' };
+      remainingCount: Number(config.CLASS_SIZE), complete: false, error: '', missingNumbers: [], rosterError: '', unmatchedCount: 0 };
     try {
       if (!isSchoolDay(day, config)) preview.error = '今日は休日に設定されています。';
       else {
-        const scores = scoresForDate(day, config);
+        const responses = responsesForDate(day, config);
+        const scores = responses.map(item => item.score);
         const readiness = responseReadiness(scores.length, config.CLASS_SIZE);
         preview = { average: readiness.complete ? averageScore(scores) : null,
           responseCount: readiness.count, expectedCount: readiness.target,
           remainingCount: readiness.remaining, complete: readiness.complete,
-          error: scores.length ? '' : '今日の回答がまだありません。' };
+          error: scores.length ? '' : '今日の回答がまだありません。',
+          missingNumbers: [], rosterError: '', unmatchedCount: 0 };
+        try {
+          const missing = missingNumbersForDate(responses);
+          preview.missingNumbers = missing.numbers;
+          preview.unmatchedCount = missing.unmatchedCount;
+          if (missing.rosterCount !== readiness.target) preview.rosterError = '在籍人数と設定のクラス人数が一致しません。';
+        } catch (rosterError) { preview.rosterError = rosterError.message; }
       }
     } catch (error) { preview.error = error.message; }
     const history = challenge ? dailyFor(challenge.challengeId) : [];
